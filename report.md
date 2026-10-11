@@ -1,74 +1,133 @@
-# Stage 0 - persistent stock-specific intraday behaviour
+# Stage B - behavioural state discovery
 
-stage0_persistence v1.0 | declaration 93f908bfe9c52af9 | 2026-10-11 21:15 | costs 4.49 bp round trip at Rs 500,000 + slippage 5 bp entry, 3 bp time exit = 12.49 bp a trade
+engine_stage_b v1.0 | engine_core v1.0 | declaration e3c6bd173874970a | 2026-10-12 00:33 | stocks HDFCBANK, ICICIBANK, SBIN, INFY, TCS, RELIANCE, BHARTIARTL, LT, MARUTI, SUNPHARMA (list ba1c73b77e553bc5) | development 2021-10-01..2024-12-31; nothing later is read
 
-## VERDICT: no persistent stock-specific behaviour
+## VERDICT: STATES INFORMATIVE
 
-No setup-side passed both legs (Holm-corrected permutation p <= 0.05 AND the H1 top decile's H2 interval above zero). Persistent on leg 1 alone: ORC_L, ORC_S, FHM_S, CMP_L, PDB_S. Stop here.
+Learned states carry out-of-sample information about which way the price goes next, beyond each stock's own time-of-day behaviour, and they are stable. This earns Stage C (confidence and evidence) for the representations marked below. It is NOT evidence of a profitable trade.
 
-## Persistence per setup-side
+Preferred representation (the simplest informative and stable one not significantly worse than the best): **grid12**.
 
-Excess = a stock's mean net per trade minus its own plain open-to-15:03 trade in the same direction (same half). rho = Spearman of H1 vs H2 excess across stocks with >= 30 trades in each half; p = one-sided permutation (stock labels shuffled, 10,000 times); Holm over 20 setup-sides. Top decile = best 10% of stocks by H1 excess; their H2 net (after costs) per trade-day with a 95% block-bootstrap interval. rho vs ATR: how much the H1 excess just tracks volatility.
+In plain words: 'Brier skill' is how much better the state predicts which barrier (+0.3 ATR or -0.3 ATR) is hit first than the stock's own time-of-day rate does (0 = no better; 0.01 = 1% lower squared error). 'IC' is the rank correlation, across the stocks at the same decision time, between the predicted and the actual next-hour return (both relative to the stock's time-of-day baseline), averaged per session. 'Magnitude' is the same skill for how far the price ranges in the next hour. All are pooled over the 5 test windows, which the models never saw; [ ] = 95% block-bootstrap interval over test sessions; Holm p corrects for the 16 direction tests.
 
-| setup-side | stocks | rho | perm p | Holm p | top-decile stocks | H2 trades | H2 win | H2 net bp/trade | H2 bp/trade-day [95%] | rho vs ATR | pass |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| ORC_L | 299 | +0.211 | 0.0003 | 0.0054 | 32 | 4,817 | 41% | -6.5 | -18.0 [-26.7, -9.0] | -0.03 | leg 1 only |
-| ORC_S | 319 | +0.205 | 0.0004 | 0.0068 | 33 | 5,367 | 51% | +3.7 | -13.0 [-20.6, -4.9] | +0.20 | leg 1 only |
-| ORF_L | 303 | +0.111 | 0.0273 | 0.3549 | 32 | 4,586 | 42% | -13.8 | -8.9 [-14.3, -3.4] | -0.17 | - |
-| ORF_S | 288 | +0.101 | 0.0408 | 0.4896 | 31 | 3,097 | 50% | -5.5 | +3.0 [-6.2, +12.1] | -0.07 | - |
-| GAPC_L | 106 | +0.144 | 0.0668 | 0.6679 | 14 | 549 | 42% | -12.4 | -17.1 [-33.9, +2.3] | +0.05 | - |
-| GAPC_S | 4 | n/a | 1.0000 | 1.0000 | 0 | 0 | n/a | n/a | n/a [n/a, n/a] | n/a | - |
-| GAPF_L | 14 | n/a | 1.0000 | 1.0000 | 6 | 137 | 45% | -11.1 | -8.8 [-28.0, +13.5] | n/a | - |
-| GAPF_S | 191 | +0.021 | 0.3945 | 1.0000 | 20 | 1,111 | 51% | -5.6 | +5.2 [-8.6, +19.4] | -0.11 | - |
-| VWR_L | 229 | +0.149 | 0.0128 | 0.1920 | 24 | 1,720 | 46% | -9.7 | +4.3 [-5.4, +14.0] | +0.03 | - |
-| VWR_S | 215 | +0.023 | 0.3687 | 1.0000 | 22 | 1,407 | 46% | -19.4 | -6.5 [-15.5, +2.7] | -0.10 | - |
-| FHM_L | 241 | +0.104 | 0.0541 | 0.5950 | 25 | 1,802 | 41% | -14.9 | -14.7 [-24.3, -5.4] | +0.07 | - |
-| FHM_S | 258 | +0.242 | 0.0001 | 0.0020 | 27 | 2,239 | 52% | +5.3 | -5.0 [-14.0, +4.1] | +0.08 | leg 1 only |
-| CMP_L | 215 | +0.202 | 0.0019 | 0.0304 | 22 | 1,319 | 39% | -9.7 | -14.5 [-22.6, -6.0] | +0.12 | leg 1 only |
-| CMP_S | 236 | +0.135 | 0.0208 | 0.2912 | 25 | 1,800 | 46% | -7.4 | -13.3 [-18.4, -8.1] | -0.01 | - |
-| PDB_L | 266 | +0.069 | 0.1308 | 1.0000 | 28 | 2,846 | 40% | -16.5 | -29.0 [-40.9, -17.8] | +0.07 | - |
-| PDB_S | 281 | +0.290 | 0.0001 | 0.0020 | 29 | 2,690 | 51% | +6.5 | -16.7 [-26.9, -7.5] | +0.23 | leg 1 only |
-| PDR_L | 267 | +0.029 | 0.3179 | 1.0000 | 28 | 2,632 | 42% | -14.8 | -8.8 [-17.6, +0.5] | -0.08 | - |
-| PDR_S | 259 | -0.003 | 0.5111 | 1.0000 | 27 | 2,604 | 49% | -13.4 | -7.4 [-17.2, +3.4] | -0.11 | - |
-| VSF_L | 314 | +0.063 | 0.1375 | 1.0000 | 33 | 6,893 | 41% | -9.7 | -8.7 [-14.4, -3.0] | +0.01 | - |
-| VSF_S | 312 | +0.057 | 0.1564 | 1.0000 | 33 | 5,545 | 50% | -5.0 | -7.6 [-13.1, -2.0] | +0.05 | - |
+| representation | states | Brier skill | Holm p | IC | Holm p | magnitude skill | seed ARI | refit ARI | PSI | persist (chance) | ECE | gross bp, n | fit s | informative | stable |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| grid12 | 12 | -0.0021 [-0.0056, +0.0013] | 1.000 | +0.013 [+0.005, +0.022] | 0.016 | +0.071 [+0.057, +0.084] | 1.00 | 1.00 | 0.014 | 0.76 (0.13) | 0.036 | +1.2, 46,925 | 0.0 | YES | YES |
+| kmeans4 | 4 | -0.0003 [-0.0029, +0.0023] | 1.000 | +0.008 [-0.000, +0.017] | 0.390 | +0.018 [+0.013, +0.022] | 0.73 | 0.78 | 0.028 | 0.86 (0.36) | 0.032 | +1.5, 47,989 | 2.6 | no | YES |
+| kmeans8 | 8 | -0.0039 [-0.0078, -0.0003] | 1.000 | +0.009 [-0.002, +0.019] | 0.825 | +0.030 [+0.021, +0.040] | 0.76 | 0.79 | 0.089 | 0.84 (0.15) | 0.039 | +1.2, 47,489 | 6.4 | no | YES |
+| gmm4 | 4 | -0.0007 [-0.0029, +0.0016] | 1.000 | +0.014 [+0.004, +0.023] | 0.030 | +0.031 [+0.025, +0.038] | 0.77 | 0.75 | 0.012 | 0.84 (0.32) | 0.035 | +1.2, 45,658 | 3.7 | YES | YES |
+| gmm8 | 8 | -0.0028 [-0.0055, -0.0000] | 1.000 | +0.005 [-0.004, +0.014] | 1.000 | +0.053 [+0.044, +0.061] | 0.75 | 0.68 | 0.084 | 0.76 (0.16) | 0.034 | +1.1, 47,275 | 9.3 | no | YES |
+| hmm4 | 4 | -0.0024 [-0.0049, +0.0003] | 1.000 | +0.012 [+0.003, +0.021] | 0.035 | +0.030 [+0.023, +0.037] | 0.93 | 0.69 | 0.015 | 0.90 (0.29) | 0.037 | +0.9, 46,969 | 4.9 | YES | YES |
+| hmm8 | 8 | -0.0062 [-0.0097, -0.0029] | 1.000 | +0.006 [-0.005, +0.016] | 1.000 | +0.039 [+0.030, +0.049] | 0.91 | 0.71 | 0.107 | 0.90 (0.14) | 0.042 | +0.4, 45,076 | 10.3 | no | YES |
+| knn100 | - | -0.0006 [-0.0030, +0.0017] | 1.000 | +0.013 [+0.003, +0.023] | 0.097 | +0.045 [+0.039, +0.052] | - | - | - | - (-) | 0.028 | +0.9, 45,017 | 5.2 | no | n/a |
 
-## All stocks pooled (context, not a rule)
+Reading the columns: seed ARI = agreement of two fits with different random starts (1 = the same states); refit ARI = agreement of the previous window's model with this window's on the same test data; PSI = how much the states' shares move from training to test (under 0.25 is stable); persist = how often the state at one decision is the same 15 minutes later (vs chance); ECE = calibration error of the predicted barrier probability; gross bp = average gross return per observation of going with the prediction when it is in the training top fifth and against it in the bottom fifth, 60-minute exit, NO costs - compare with 12.49 bp per trade. It is context, not a strategy and not a gate.
 
-| setup-side | H1 trades | H1 win | H1 net bp/trade | H2 trades | H2 win | H2 net bp/trade |
-|---|---|---|---|---|---|---|
-| ORC_L | 49,526 | 41% | -21.0 | 74,555 | 41% | -14.7 |
-| ORC_S | 57,291 | 49% | +1.2 | 89,436 | 47% | -7.6 |
-| ORF_L | 45,477 | 39% | -25.8 | 72,003 | 40% | -18.0 |
-| ORF_S | 40,312 | 48% | -5.7 | 59,964 | 49% | -9.8 |
-| GAPC_L | 8,576 | 41% | -23.5 | 12,476 | 41% | -20.5 |
-| GAPC_S | 4,648 | 51% | +10.1 | 4,122 | 43% | -20.7 |
-| GAPF_L | 6,375 | 43% | -22.9 | 6,867 | 47% | +1.8 |
-| GAPF_S | 12,599 | 52% | +5.8 | 20,055 | 51% | -4.2 |
-| VWR_L | 18,655 | 44% | -21.0 | 29,940 | 45% | -14.9 |
-| VWR_S | 14,890 | 49% | -5.9 | 26,193 | 48% | -15.9 |
-| FHM_L | 20,693 | 41% | -19.0 | 31,195 | 41% | -14.2 |
-| FHM_S | 24,845 | 50% | +3.4 | 39,835 | 48% | -7.0 |
-| CMP_L | 16,079 | 39% | -16.4 | 23,547 | 39% | -8.2 |
-| CMP_S | 19,235 | 44% | -4.0 | 28,639 | 45% | -6.6 |
-| PDB_L | 28,415 | 40% | -23.8 | 44,564 | 40% | -17.6 |
-| PDB_S | 30,684 | 48% | -2.0 | 50,036 | 47% | -7.0 |
-| PDR_L | 26,966 | 41% | -21.0 | 42,532 | 42% | -15.3 |
-| PDR_S | 28,949 | 50% | -1.6 | 43,692 | 50% | -5.9 |
-| VSF_L | 62,047 | 40% | -22.5 | 98,131 | 41% | -12.8 |
-| VSF_S | 61,319 | 48% | -2.0 | 96,584 | 47% | -10.8 |
+## State confidence is not trade confidence (grid12)
 
-## Context
+Brier skill of the barrier prediction by state-confidence tercile (top state probability; training cut-offs), and on observations unlike the training data (novel: beyond its 1st percentile of likelihood / distance).
 
-- Plain open-to-15:03 long trade, H1 vs H2 per-stock Spearman: +0.070 over 347 stocks (how much intraday drift persists on its own; the excess removes it).
-- Stocks with usable sessions: 794 of 815 liquid equity stocks (16 liquid stock(s) without a 3-minute file).
-- Liquid stock-days with a usable session (after reconciliation and the 80% rule): H1 98.1% of 98,505; H2 98.1% of 151,852.
-- Data checks in H1-H2: 584,418 sessions with bars, 16,924 failed reconciliation, 1,508 without a first bar or under 80% of bars, 0 unreadable files, 1 stock-days dropped by the 20% gap guard.
-- Nothing after 2024-12-31 was read into any number.
+| representation | low-confidence skill (n) | mid | high | novel share | novel skill |
+|---|---|---|---|---|---|
+| kmeans4 | hard states: no probability to grade | | | 0.019 | +0.0027 |
+| kmeans8 | hard states: no probability to grade | | | 0.019 | -0.0034 |
+| gmm4 | -0.0017 (23,349) | -0.0039 (20,705) | +0.0034 (21,540) | 0.018 | -0.0062 |
+| gmm8 | -0.0011 (22,953) | -0.0021 (21,260) | -0.0053 (21,381) | 0.019 | -0.0061 |
+| hmm4 | -0.0017 (24,598) | -0.0048 (20,006) | -0.0009 (20,990) | 0.019 | -0.0088 |
+| hmm8 | -0.0055 (25,150) | -0.0073 (20,741) | -0.0059 (19,703) | 0.018 | -0.0087 |
 
-## Caveats
+## Calibration of the predicted barrier probability (grid12, all test windows)
 
-- In-sample screen only: H1 and H2 are both inside 2021-10 to 2024-12; a PASS earns a Stage 1 build, not money. 2025 onward stays untouched for later confirmation
-- A setup that enters later in the day keeps a small part of the stock's drift in its excess (it skips the morning part of the plain trade); with about 60 trades per stock per half this is small next to the noise, and the H2 leg judges net money, not the excess
-- Costs are assumed (slippage not measured); the time exit is fixed at 15:03 for every setup
-- One permutation per setup-side; the shuffles are not shared across setup-sides, so the Holm correction does not use their correlation (conservative)
+| predicted | n | mean predicted | observed |
+|---|---|---|---|
+| 0.2-0.3 | 119 | 0.282 | 0.345 |
+| 0.3-0.4 | 4,559 | 0.371 | 0.454 |
+| 0.4-0.5 | 34,456 | 0.459 | 0.494 |
+| 0.5-0.6 | 25,386 | 0.532 | 0.505 |
+| 0.6-0.7 | 1,074 | 0.621 | 0.532 |
+
+Brier 0.2516 vs R0 0.2511; log loss 0.6965 vs R0 0.6954; ECE 0.036. These probabilities are the state's average outcome on past data, shrunk; they are NOT yet calibrated probabilities (that is Stage C, on a separate slice).
+
+## State cards (grid12, last fold's model, training window)
+
+Each state's share of training decisions and the 4 features furthest from typical (robust z, + = above usual). Outcome columns: the pooled shrunk deviation from the time-of-day baseline (barrier probability in points, next-hour return in ATR).
+
+| state | share | what it looks like | barrier prob. dev. | next-hour ret dev. (ATR) |
+|---|---|---|---|---|
+| 0 | 0.115 | i_or -4.2, i_ret -1.2, i_vwap -1.1, i_eff +1.0 | -0.0480 | -0.0091 |
+| 1 | 0.105 | i_or -3.5, i_ret -1.7, i_vwap -1.4, i_pdh -1.4 | -0.0152 | -0.0032 |
+| 2 | 0.007 | i_or -1.7, i_ret -0.9, rs_n -0.9, al_w -0.7 | +0.0074 | -0.0057 |
+| 3 | 0.017 | i_rv +1.4, i_rng +1.3, i_ret -1.2, rs_n -1.1 | +0.0115 | -0.0100 |
+| 4 | 0.194 | i_or -1.0, i_rv -0.8, i_vx +0.6, i_rng -0.6 | -0.0211 | -0.0041 |
+| 5 | 0.079 | i_rv +0.9, i_or -0.8, i_vwap -0.8, d_rng1 +0.6 | -0.0329 | -0.0073 |
+| 6 | 0.182 | i_or +1.0, i_rv -0.7, i_vx +0.6, i_rng -0.6 | +0.0261 | +0.0041 |
+| 7 | 0.077 | i_or +1.0, i_rv +0.9, i_vwap +0.8, d_rng1 +0.7 | +0.0321 | +0.0073 |
+| 8 | 0.005 | i_or +2.0, i_ret +1.0, rs_n +1.0, al_w +0.9 | +0.0159 | +0.0044 |
+| 9 | 0.019 | i_rng +1.4, i_rv +1.4, rs_n +1.3, i_ret +1.3 | +0.0107 | +0.0021 |
+| 10 | 0.093 | i_or +4.3, i_ret +1.3, i_vwap +1.2, rs_n +1.1 | +0.0346 | +0.0096 |
+| 11 | 0.107 | i_or +3.7, i_ret +1.8, rs_n +1.7, i_rng +1.5 | +0.0230 | +0.0065 |
+
+## Per fold
+
+| fold | train | test | representation | test rows | seed ARI | refit ARI | PSI | fit s |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 2021-10-01..2022-09-30 | 2022-10-01..2023-03-31 | grid12 | 25,746 | 1.00 | - | 0.024 | 0.0 |
+| 1 | 2021-10-01..2022-09-30 | 2022-10-01..2023-03-31 | kmeans4 | 25,746 | 0.52 | - | 0.013 | 1.8 |
+| 1 | 2021-10-01..2022-09-30 | 2022-10-01..2023-03-31 | kmeans8 | 25,746 | 0.60 | - | 0.029 | 3.3 |
+| 1 | 2021-10-01..2022-09-30 | 2022-10-01..2023-03-31 | gmm4 | 25,746 | 0.64 | - | 0.012 | 2.2 |
+| 1 | 2021-10-01..2022-09-30 | 2022-10-01..2023-03-31 | gmm8 | 25,746 | 0.67 | - | 0.029 | 5.7 |
+| 1 | 2021-10-01..2022-09-30 | 2022-10-01..2023-03-31 | hmm4 | 25,746 | 1.00 | - | 0.015 | 4.8 |
+| 1 | 2021-10-01..2022-09-30 | 2022-10-01..2023-03-31 | hmm8 | 25,746 | 0.57 | - | 0.021 | 5.5 |
+| 1 | 2021-10-01..2022-09-30 | 2022-10-01..2023-03-31 | knn100 | 25,746 | - | - | - | 3.2 |
+| 2 | 2021-10-01..2023-03-31 | 2023-04-01..2023-09-30 | grid12 | 25,704 | 1.00 | 1.00 | 0.011 | 0.0 |
+| 2 | 2021-10-01..2023-03-31 | 2023-04-01..2023-09-30 | kmeans4 | 25,704 | 0.69 | 0.68 | 0.042 | 1.9 |
+| 2 | 2021-10-01..2023-03-31 | 2023-04-01..2023-09-30 | kmeans8 | 25,704 | 0.64 | 0.67 | 0.149 | 4.2 |
+| 2 | 2021-10-01..2023-03-31 | 2023-04-01..2023-09-30 | gmm4 | 25,704 | 0.77 | 0.71 | 0.028 | 2.1 |
+| 2 | 2021-10-01..2023-03-31 | 2023-04-01..2023-09-30 | gmm8 | 25,704 | 0.56 | 0.46 | 0.084 | 5.8 |
+| 2 | 2021-10-01..2023-03-31 | 2023-04-01..2023-09-30 | hmm4 | 25,704 | 1.00 | 0.54 | 0.044 | 3.0 |
+| 2 | 2021-10-01..2023-03-31 | 2023-04-01..2023-09-30 | hmm8 | 25,704 | 1.00 | 0.56 | 0.169 | 8.4 |
+| 2 | 2021-10-01..2023-03-31 | 2023-04-01..2023-09-30 | knn100 | 25,704 | - | - | - | 4.5 |
+| 3 | 2021-10-01..2023-09-30 | 2023-10-01..2024-03-31 | grid12 | 25,179 | 1.00 | 1.00 | 0.014 | 0.0 |
+| 3 | 2021-10-01..2023-09-30 | 2023-10-01..2024-03-31 | kmeans4 | 25,179 | 0.68 | 0.94 | 0.033 | 2.3 |
+| 3 | 2021-10-01..2023-09-30 | 2023-10-01..2024-03-31 | kmeans8 | 25,179 | 1.00 | 0.69 | 0.089 | 6.9 |
+| 3 | 2021-10-01..2023-09-30 | 2023-10-01..2024-03-31 | gmm4 | 25,179 | 0.71 | 0.89 | 0.048 | 3.3 |
+| 3 | 2021-10-01..2023-09-30 | 2023-10-01..2024-03-31 | gmm8 | 25,179 | 1.00 | 0.56 | 0.131 | 12.0 |
+| 3 | 2021-10-01..2023-09-30 | 2023-10-01..2024-03-31 | hmm4 | 25,179 | 1.00 | 0.91 | 0.055 | 4.1 |
+| 3 | 2021-10-01..2023-09-30 | 2023-10-01..2024-03-31 | hmm8 | 25,179 | 1.00 | 0.75 | 0.115 | 10.9 |
+| 3 | 2021-10-01..2023-09-30 | 2023-10-01..2024-03-31 | knn100 | 25,179 | - | - | - | 6.0 |
+| 4 | 2021-10-01..2024-03-31 | 2024-04-01..2024-09-30 | grid12 | 26,040 | 1.00 | 1.00 | 0.007 | 0.0 |
+| 4 | 2021-10-01..2024-03-31 | 2024-04-01..2024-09-30 | kmeans4 | 26,040 | 0.76 | 0.74 | 0.001 | 2.9 |
+| 4 | 2021-10-01..2024-03-31 | 2024-04-01..2024-09-30 | kmeans8 | 26,040 | 0.58 | 0.86 | 0.012 | 7.0 |
+| 4 | 2021-10-01..2024-03-31 | 2024-04-01..2024-09-30 | gmm4 | 26,040 | 0.71 | 0.72 | 0.001 | 3.6 |
+| 4 | 2021-10-01..2024-03-31 | 2024-04-01..2024-09-30 | gmm8 | 26,040 | 0.51 | 0.81 | 0.010 | 9.6 |
+| 4 | 2021-10-01..2024-03-31 | 2024-04-01..2024-09-30 | hmm4 | 26,040 | 0.67 | 0.67 | 0.001 | 4.7 |
+| 4 | 2021-10-01..2024-03-31 | 2024-04-01..2024-09-30 | hmm8 | 26,040 | 1.00 | 0.62 | 0.013 | 13.1 |
+| 4 | 2021-10-01..2024-03-31 | 2024-04-01..2024-09-30 | knn100 | 26,040 | - | - | - | 8.0 |
+| 5 | 2021-10-01..2024-09-30 | 2024-10-01..2024-12-31 | grid12 | 12,768 | 1.00 | 1.00 | 0.019 | 0.0 |
+| 5 | 2021-10-01..2024-09-30 | 2024-10-01..2024-12-31 | kmeans4 | 12,768 | 1.00 | 0.77 | 0.028 | 4.0 |
+| 5 | 2021-10-01..2024-09-30 | 2024-10-01..2024-12-31 | kmeans8 | 12,768 | 1.00 | 0.94 | 0.116 | 10.4 |
+| 5 | 2021-10-01..2024-09-30 | 2024-10-01..2024-12-31 | gmm4 | 12,768 | 1.00 | 0.68 | 0.002 | 7.1 |
+| 5 | 2021-10-01..2024-09-30 | 2024-10-01..2024-12-31 | gmm8 | 12,768 | 1.00 | 0.91 | 0.096 | 13.6 |
+| 5 | 2021-10-01..2024-09-30 | 2024-10-01..2024-12-31 | hmm4 | 12,768 | 1.00 | 0.64 | 0.004 | 8.0 |
+| 5 | 2021-10-01..2024-09-30 | 2024-10-01..2024-12-31 | hmm8 | 12,768 | 1.00 | 0.92 | 0.107 | 13.2 |
+| 5 | 2021-10-01..2024-09-30 | 2024-10-01..2024-12-31 | knn100 | 12,768 | - | - | - | 4.3 |
+
+## Data
+
+- HDFCBANK (NIFTY BANK): 793 clean of 799 development sessions; 16,653 decision points; barrier resolved 57.6% (1 hit both barriers inside one bar - order unknown, left out)
+- ICICIBANK (NIFTY BANK): 796 clean of 799 development sessions; 16,716 decision points; barrier resolved 61.7% (1 hit both barriers inside one bar - order unknown, left out)
+- SBIN (NIFTY BANK): 799 clean of 799 development sessions; 16,779 decision points; barrier resolved 59.0% (1 hit both barriers inside one bar - order unknown, left out)
+- INFY (NIFTY IT): 796 clean of 799 development sessions; 16,716 decision points; barrier resolved 51.9% (0 hit both barriers inside one bar - order unknown, left out)
+- TCS (NIFTY IT): 799 clean of 799 development sessions; 16,779 decision points; barrier resolved 55.0% (0 hit both barriers inside one bar - order unknown, left out)
+- RELIANCE: 795 clean of 799 development sessions; 16,695 decision points; barrier resolved 58.8% (1 hit both barriers inside one bar - order unknown, left out)
+- BHARTIARTL: 793 clean of 799 development sessions; 16,653 decision points; barrier resolved 57.3% (0 hit both barriers inside one bar - order unknown, left out)
+- LT: 797 clean of 799 development sessions; 16,737 decision points; barrier resolved 56.4% (1 hit both barriers inside one bar - order unknown, left out)
+- MARUTI: 796 clean of 799 development sessions; 16,716 decision points; barrier resolved 55.3% (3 hit both barriers inside one bar - order unknown, left out)
+- SUNPHARMA: 798 clean of 799 development sessions; 16,758 decision points; barrier resolved 59.1% (1 hit both barriers inside one bar - order unknown, left out)
+
+## Limitations (stated before the run)
+
+- In-sample to the project: 2021-10..2024-12 was already searched by BIGMOVE discovery and Stage 0. The walk-forward test windows are out of sample for these models only.
+- Decision points 15 minutes apart with 60-minute outcomes overlap; the bootstrap resamples whole sessions in blocks of 10, which keeps that overlap inside each resample.
+- Information is not money: a state can predict direction a little and still lose after 12.49 bp a trade. Stage B prices nothing.
+- Experiments: this run adds 8 representations to experiments.jsonl (cumulative count 8); prior research before the engine: at least 84 + 6 + 80 + 20 = 190 declared cells before this engine, plus their gate and exit variants; the engine's own experiments are added in experiments.jsonl.
